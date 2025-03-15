@@ -1,80 +1,62 @@
-import columns
-from lib2to3.fixer_util import touch_import
-
 import streamlit as st
 import pickle
 import numpy as np
-import  pandas as pd
+import pandas as pd
 
-pipe = pickle.load(open('pipe.pkl','rb'))
-df = pickle.load(open('df.pkl','rb'))
+# Load trained model and dataset
+pipe = pickle.load(open('pipe.pkl', 'rb'))
+df = pickle.load(open('df.pkl', 'rb'))
 
+# Ensure df is a DataFrame
 if not isinstance(df, pd.DataFrame):
     df = pd.DataFrame(df)
 
+st.title("💻 Laptop Price Prediction")
 
-st.title("Laptop Price prediction")
+# User inputs
+company = st.selectbox('Brand', df['Company'].unique())
+Type = st.selectbox("Laptop Type", df['TypeName'].unique())
+RAM = st.selectbox("RAM (GB)", df['Ram'].unique())
+memory = st.selectbox("Storage (GB)", df['Memory'].unique())
+weight = st.number_input("Weight (kg)")
+Touch_screen = st.radio("Touch Screen", ['Yes', 'No'])
+full_hd = st.radio("Full HD Display", ['Yes', 'No'])
+Ips = st.radio("IPS Panel", ['Yes', 'No'])
+screen_size = st.number_input("Screen Size (inches)")
+resolution = st.selectbox("Screen Resolution", [
+    "1366x768", "1920x1080", "2560x1440", "2560x1600",
+    "2880x1800", "3200x1800", "3840x2160"
+])
+Cpu_brand = st.selectbox("CPU Brand", df['Cpu Brand'].unique())
+Gpu_brand = st.selectbox("GPU Brand", df['Gpu brand'].unique())
+Os = st.selectbox("Operating System", df['Operating system'].unique())
 
-# brand
-company = st.selectbox('Brand',df['Company'].unique())
+if st.button("🔍 Predict Price"):
+    # Convert categorical Yes/No values to binary
+    Touch_screen = 1 if Touch_screen == 'Yes' else 0
+    full_hd = 1 if full_hd == 'Yes' else 0
+    Ips = 1 if Ips == 'Yes' else 0
 
-# type of laptop
+    # Extract screen resolution
+    x_res, y_res = map(int, resolution.split('x'))
+    ppi = ((x_res**2 + y_res**2) ** 0.5) / screen_size
 
-Type = st.selectbox("type",df['TypeName'].unique())
-# ram
-RAM = st.selectbox("Ram",df['Ram'].unique())
+    # Prepare input array
+    query = np.array([company, Type, RAM, memory, weight, Touch_screen,
+                      full_hd, Ips, ppi, Cpu_brand, Gpu_brand, Os]).reshape(1, -1)
 
-memory = st.selectbox("Memory",df['Memory'].unique())
-
-# weight
-weight = st.number_input("Weight")
-
-# touch screen
-Touch_screen = st.selectbox("Touch Screen",['Yes','No'])
-
-full_hd = st.selectbox("Full HD",['Yes','No'])
-# ips
-Ips = st.selectbox("IPS",['Yes','No'])
-
-screen_size = st.number_input("screen size")
-
-resolution = st.selectbox("Screen resolution",["1366x768",
-    "1920x1080",
-    "2560x1440",
-    "2560x1600",
-    "2880x1800",
-    "3200x1800",
-    "3840x2160"])
-
-#cpu brand
-Cpu_brand = st.selectbox("Cpu_brand",df['Cpu Brand'].unique())
-
-Gpu_brand = st.selectbox("Gpu_brand",df['Gpu brand'].unique())
-
-Os = st.selectbox("Operating System",df['Operating system'].unique())
-
-if st.button("Predict Price"):
-    if Touch_screen == 'Yes':
-        Touch_screen =1
-    else:
-        Touch_screen = 0
-
-    if Ips == 'Yes':
-        Ips = 1
-    else:
-        Ips = 0
-
-    if full_hd == 'Yes':
-        full_hd = 1
-    else:
-        full_hd =0
-
-    x_res = int(resolution.split('x')[0])
-    y_res = int(resolution.split('x')[1])
-    ppi = ((x_res**2)+(y_res**2))**0.5/screen_size
-
-    query = np.array([company,Type,RAM,memory,weight,Touch_screen,full_hd,Ips,ppi,Cpu_brand,Gpu_brand,Os])
-    query= query.reshape(1,12)
+    # Convert to DataFrame with proper column names
+    column_names = ['Company', 'TypeName', 'Ram', 'Memory', 'Weight', 'Touchscreen',
+                    'full_HD', 'IPS', 'ppi', 'Cpu Brand', 'Gpu brand', 'Operating system']
 
 
-    st.title(np.exp(pipe.predict(query)))
+    query_df = pd.DataFrame(query, columns=column_names)
+
+    # Ensure all column names are strings
+    query_df.columns = query_df.columns.astype(str)
+
+    # Predict price
+    predicted_price = np.exp(pipe.predict(query_df)[0])  # Remove np.exp() if not log-transformed
+
+    # Display prediction
+    st.success(f"💲 The estimated price of this laptop is **₹{int(predicted_price)}**")
